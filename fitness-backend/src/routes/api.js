@@ -336,4 +336,307 @@ router.get('/profile', authenticateToken, async (req, res) => {
 });
 
 
+
+async function fetchAllRowsFromCursor(resultSet) {
+    let rows = [];
+    let row;
+    try {
+        while ((row = await resultSet.getRow())) {
+            rows.push(row);
+        }
+    } catch (err) {
+        console.error("Ошибка при чтении строк из курсора:", err);
+        throw err;
+    } finally {
+        if (resultSet) {
+            await resultSet.close();
+        }
+    }
+    return rows;
+}
+
+const checkAdminRole = (req, res, next) => {
+    if (!req.user || req.user.role !== 'Admin') {
+        return res.status(403).json({ success: false, message: 'Доступ запрещен. Требуется роль Администратора.' });
+    }
+    next();
+};
+
+// Роут 5.1: Получение полного расписания для админки (Read) - ЗАЩИЩЕННЫЙ
+// GET /api/admin/schedule
+router.get('/admin/schedule', authenticateToken, checkAdminRole, async (req, res) => {
+    let connection;
+    try {
+        connection = await db.getConnection();
+
+        // 1. Получаем расписание через реф-курсор
+        const result = await connection.execute(
+            `BEGIN :rc := FITNESS_API_PKG.GET_SCHEDULE_FOR_ADMIN; END;`,
+            { rc: { dir: db.oracledb.BIND_OUT, type: db.oracledb.CURSOR } }
+        );
+
+        const scheduleData = await fetchAllRowsFromCursor(result.outBinds.rc);
+
+        // Внимание: Oracle вернет имена столбцов в верхнем регистре (ID, TITLE, WEEKDAY_SHORT и т.д.)
+        // На фронтенде вам нужно будет привести их к camelCase (id, title, weekday)
+
+        res.status(200).json({
+            success: true,
+            message: 'Расписание для администрирования успешно получено.',
+            data: scheduleData
+        });
+
+    } catch (err) {
+        console.error('Ошибка при получении расписания для админки:', err);
+        res.status(500).json({ success: false, message: 'Ошибка сервера при получении расписания', error: err.message });
+    } finally {
+        if (connection) await connection.close();
+    }
+});
+
+
+// Роут 5.2: Добавление нового занятия (Create) - ЗАЩИЩЕННЫЙ
+// POST /api/admin/schedule/create
+router.post('/admin/schedule/create', authenticateToken, checkAdminRole, async (req, res) => {
+    let connection;
+    try {
+        const { trainerId, roomId, activityId, scheduleDate, startTime, endTime, maxParticipants, notes } = req.body;
+
+        if (!trainerId || !roomId || !activityId || !scheduleDate || !startTime || !endTime || !maxParticipants) {
+            return res.status(400).json({ success: false, message: 'Необходимо заполнить все обязательные поля расписания.'});
+        }
+        
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `BEGIN FITNESS_API_PKG.CREATE_SCHEDULE_ITEM(
+                :p_trainer_id, :p_room_id, :p_activity_id, :p_schedule_date, :p_start_time, 
+                :p_end_time, :p_max_participants, :p_notes, :p_new_schedule_id
+            ); END;`,
+            {
+                p_trainer_id: trainerId,
+                p_room_id: roomId,
+                p_activity_id: activityId,
+                p_schedule_date: scheduleDate, // Убедитесь, что формат даты подходит для Oracle DATE
+                p_start_time: startTime,       // TIME или TIMESTAMP в зависимости от вашей БД
+                p_end_time: endTime,
+                p_max_participants: maxParticipants,
+                p_notes: notes || null,
+                p_new_schedule_id: { type: db.oracledb.NUMBER, dir: db.oracledb.BIND_OUT }
+            },
+            { autoCommit: true }
+        );
+        
+        const newScheduleId = result.outBinds.p_new_schedule_id;
+
+        res.status(201).json({
+            success: true,
+            message: 'Занятие успешно добавлено в расписание.',
+            id: newScheduleId
+        });
+
+    } catch (err) {
+        console.error('Ошибка при создании занятия:', err);
+        if (err.message.includes('ORA-20002')) {
+            const userMessage = err.message.replace(/ORA-20002: /, '').split('\n')[0];
+            return res.status(400).json({ success: false, message: userMessage });
+        }
+        res.status(500).json({ success: false, message: 'Ошибка сервера при добавлении занятия', error: err.message });
+    } finally {
+        if (connection) await connection.close();
+    }
+});
+
+
+// Роут 5.3: Редактирование занятия (Update) - ЗАЩИЩЕННЫЙ
+// POST /api/admin/schedule/update
+router.post('/admin/schedule/update', authenticateToken, checkAdminRole, async (req, res) => {
+    let connection;
+    try {
+        const { id, trainerId, roomId, activityId, scheduleDate, startTime, endTime, maxParticipants, status, notes } = req.body;
+
+        if (!id || !trainerId || !roomId || !activityId || !scheduleDate || !startTime || !endTime || !maxParticipants || !status) {
+            return res.status(400).json({ success: false, message: 'Необходимо заполнить все обязательные поля для обновления.'});
+        }
+        
+        connection = await db.getConnection();
+
+        await connection.execute(
+            `BEGIN FITNESS_API_PKG.UPDATE_SCHEDULE_ITEM(
+                :p_schedule_id, :p_trainer_id, :p_room_id, :p_activity_id, :p_schedule_date, 
+                :p_start_time, :p_end_time, :p_max_participants, :p_status, :p_notes
+            ); END;`,
+            {
+                p_schedule_id: id,
+                p_trainer_id: trainerId,
+                p_room_id: roomId,
+                p_activity_id: activityId,
+                p_schedule_date: scheduleDate,
+                p_start_time: startTime,
+                p_end_time: endTime,
+                p_max_participants: maxParticipants,
+                p_status: status,
+                p_notes: notes || null,
+            },
+            { autoCommit: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: `Занятие ${id} успешно обновлено.`
+        });
+
+    } catch (err) {
+        console.error('Ошибка при редактировании занятия:', err);
+        if (err.message.includes('ORA-20002')) {
+            const userMessage = err.message.replace(/ORA-20002: /, '').split('\n')[0];
+            return res.status(404).json({ success: false, message: userMessage });
+        }
+        res.status(500).json({ success: false, message: 'Ошибка сервера при обновлении занятия', error: err.message });
+    } finally {
+        if (connection) await connection.close();
+    }
+});
+
+
+// Роут 5.4: Удаление занятия (Delete) - ЗАЩИЩЕННЫЙ
+// POST /api/admin/schedule/delete
+router.post('/admin/schedule/delete', authenticateToken, checkAdminRole, async (req, res) => {
+    let connection;
+    try {
+        const { scheduleId } = req.body;
+
+        if (!scheduleId) {
+            return res.status(400).json({ success: false, message: 'Не указан ID занятия для удаления.'});
+        }
+        
+        connection = await db.getConnection();
+
+        await connection.execute(
+            `BEGIN FITNESS_API_PKG.DELETE_SCHEDULE_ITEM(:p_schedule_id); END;`,
+            { p_schedule_id: scheduleId },
+            { autoCommit: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: `Занятие ${scheduleId} успешно удалено.`
+        });
+
+    } catch (err) {
+        console.error('Ошибка при удалении занятия:', err);
+        if (err.message.includes('ORA-20003')) {
+            const userMessage = err.message.replace(/ORA-20003: /, '').split('\n')[0];
+            return res.status(404).json({ success: false, message: userMessage });
+        }
+        res.status(500).json({ success: false, message: 'Ошибка сервера при удалении занятия', error: err.message });
+    } finally {
+        if (connection) await connection.close();
+    }
+});
+
+router.get('/admin/ref/trainers', authenticateToken, checkAdminRole, async (req, res) => {
+    let connection;
+
+    try {
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `BEGIN :rc := FITNESS_API_PKG.GET_TRAINERS_REF; END;`,
+            { rc: { dir: db.oracledb.BIND_OUT, type: db.oracledb.CURSOR } }
+        );
+
+        const cursor = result.outBinds.rc;
+        const trainers = [];
+        let row;
+
+        while ((row = await cursor.getRow())) {
+            trainers.push({
+                id: row.TRAINER_ID,
+                name: row.FULL_NAME
+            });
+        }
+
+        await cursor.close();
+
+        res.json({ success: true, data: trainers });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Ошибка получения тренеров" });
+    } finally {
+        if (connection) await connection.close();
+    }
+});
+
+router.get('/admin/ref/rooms', authenticateToken, checkAdminRole, async (req, res) => {
+    let connection;
+
+    try {
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `BEGIN :rc := FITNESS_API_PKG.GET_ROOMS_REF; END;`,
+            { rc: { dir: db.oracledb.BIND_OUT, type: db.oracledb.CURSOR } }
+        );
+
+        const cursor = result.outBinds.rc;
+        const rooms = [];
+        let row;
+
+        while ((row = await cursor.getRow())) {
+            rooms.push({
+                id: row.ID,
+                name: row.ROOM_NAME
+            });
+        }
+
+        await cursor.close();
+
+        res.json({ success: true, data: rooms });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Ошибка получения комнат" });
+    } finally {
+        if (connection) await connection.close();
+    }
+});
+
+router.get('/admin/ref/activities', authenticateToken, checkAdminRole, async (req, res) => {
+    let connection;
+
+    try {
+        connection = await db.getConnection();
+
+        const result = await connection.execute(
+            `BEGIN :rc := FITNESS_API_PKG.GET_ACTIVITIES_REF; END;`,
+            { rc: { dir: db.oracledb.BIND_OUT, type: db.oracledb.CURSOR } }
+        );
+
+        const cursor = result.outBinds.rc;
+        const activities = [];
+        let row;
+
+        while ((row = await cursor.getRow())) {
+            activities.push({
+                id: row.ID,
+                title: row.ACTIVITY_NAME,
+                direction: row.DIFFICULTY_LEVEL
+            });
+        }
+
+        await cursor.close();
+
+        res.json({ success: true, data: activities });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Ошибка получения активностей" });
+    } finally {
+        if (connection) await connection.close();
+    }
+});
+
+
 module.exports = router;

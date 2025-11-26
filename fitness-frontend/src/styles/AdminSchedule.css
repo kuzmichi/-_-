@@ -1,0 +1,315 @@
+/* ======================================= */
+/* 1. Общий контейнер и кнопки             */
+/* ======================================= */
+.admin-schedule {
+  width: 100%;
+  padding: 20px;
+}
+
+.admin-schedule.error {
+  color: #991b1b; /* Dark red from success/error block */
+  font-weight: 600;
+  font-size: 18px;
+  background-color: #fee2e2;
+  padding: 15px;
+  border-radius: var(--border-radius);
+}
+
+.btn-add-new {
+  padding: 12px 20px;
+  margin-bottom: 25px;
+  background-color: var(--color-primary);
+  color: var(--color-text-light);
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.btn-add-new:hover {
+  background-color: var(--color-primary-dark);
+  transform: translateY(-2px);
+}
+
+/* ======================================= */
+/* 2. Вкладки (Tabs)                       */
+/* ======================================= */
+.schedule-tabs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 10px;
+}
+
+.schedule-tab {
+  border: 1px solid #e2e8f0;
+  padding: 8px 15px;
+  background: var(--color-text-light);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--color-text-dark);
+  transition: 0.2s;
+}
+
+.schedule-tab:hover {
+  background: var(--color-bg-light);
+}
+
+.schedule-tab.active {
+  background: var(--color-primary);
+  color: var(--color-text-light);
+  border-color: var(--color-primary);
+  font-weight: 600;
+}
+
+.schedule-count {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--color-text-muted);
+  padding: 8px 0;
+}
+
+/* ======================================= */
+/* 3. Сетка карточек (Grid)                */
+/* ======================================= */
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 25px;
+}
+
+/* ======================================= */
+/* 4. Карточка занятия (Card)              */
+/* ======================================= */
+.schedule-card {
+  background: var(--color-text-light);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s;
+  position: relative; /* Для позиционирования тега */
+}
+
+.schedule-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Tags (Направление) */
+.tag {
+  position: absolute;
+  top: 35px;
+  right: 35px;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-light);
+  z-index: 10;
+  text-transform: uppercase;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Цвета тегов: сохраняем яркие цвета для лучшей идентификации */
+.tag-mindbody {
+  background: #4caf50;
+}
+
+.tag-сила,
+.tag-силовая {
+  background: #f44336;
+}
+
+.tag-кардио,
+.tag-cardio {
+  background: #2196f3;
+}
+
+/* Image */
+.card-image {
+  width: 100%;
+  height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-bg-light);
+  margin-bottom: 15px;
+  position: relative; /* Для позиционирования тега */
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 100%;
+  height: 100%;
+  background: #e0e0e0;
+}
+
+/* Text */
+.card-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 5px 0 10px;
+  color: var(--color-text-dark);
+}
+
+.card-time {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  margin-bottom: 5px;
+}
+
+.card-time .day {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  margin-left: 5px;
+  text-transform: uppercase;
+}
+
+.card-trainer,
+.card-room {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* Spots and Progress */
+.spots-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 15px 0 5px;
+  font-size: 14px;
+  color: var(--color-text-dark);
+  font-weight: 500;
+}
+
+.progress {
+  height: 8px;
+  background: #e5e7eb; /* Light grey background */
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-secondary); /* Зеленый акцент для заполнения */
+  transition: width 0.3s;
+}
+
+/* ======================================= */
+/* 5. Кнопки действий (Actions)            */
+/* ======================================= */
+.card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-edit, .btn-delete {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+  font-weight: 600;
+}
+
+/* Редактировать - Основной цвет */
+.btn-edit {
+  background: var(--color-primary);
+  color: var(--color-text-light);
+}
+
+.btn-edit:hover {
+  background: var(--color-primary-dark);
+}
+
+/* Удалить - Цвет опасности */
+.btn-delete {
+  background: #ef4444; /* Красный */
+  color: var(--color-text-light);
+}
+
+.btn-delete:hover {
+  background: #dc2626;
+}
+
+/* ======================================= */
+/* 6. Стили модального окна (Modal)        */
+/* ======================================= */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--color-text-light);
+    padding: 30px;
+    border-radius: var(--border-radius);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: var(--color-text-dark);
+}
+
+.modal-content p {
+    margin-bottom: 20px;
+    color: var(--color-text-muted);
+}
+
+.modal-content button {
+    padding: 10px 20px;
+    margin: 5px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s, transform 0.2s;
+}
+.modal-content button:hover {
+    transform: translateY(-1px);
+}
+/* Кнопка Сохранить */
+.modal-content button:first-of-type { 
+    background-color: var(--color-primary);
+    color: var(--color-text-light);
+}
+.modal-content button:first-of-type:hover {
+    background-color: var(--color-primary-dark);
+}
+/* Кнопка Отмена */
+.modal-content button:last-of-type {
+    background-color: #e5e7eb;
+    color: var(--color-text-dark);
+}
+.modal-content button:last-of-type:hover {
+    background-color: #d1d5db;
+}
